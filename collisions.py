@@ -16,7 +16,6 @@ Dans les DEUX cas, la quantité de mouvement totale p = m*v se conserve.
 import numpy as np                          # calculs sur les nombres
 import matplotlib.pyplot as plt             # pour dessiner
 import matplotlib.animation as animation    # pour animer
-from matplotlib.patches import Ellipse      # boule déformable (pour le choc inélastique)
 
 # ---------------------------------------------------------------------------
 # ETAPE 1 : les données du problème (les "ingrédients")
@@ -134,33 +133,14 @@ def preparer_axe(ax, titre):
 preparer_axe(ax_haut, "ELASTIQUE : les boules rebondissent (énergie conservée)")
 preparer_axe(ax_bas, "INELASTIQUE : les boules restent collées (énergie perdue)")
 
-# Panneau du HAUT (élastique) : de vrais CERCLES qui restent ronds (aucune
-# déformation, car l'énergie est conservée).
+# Les dessins des boules (des cercles) et les textes d'information
 boule1_h = plt.Circle((monde_elastique["x1"], 0), r1, color="#e74c3c")
 boule2_h = plt.Circle((monde_elastique["x2"], 0), r2, color="#3498db")
 ax_haut.add_patch(boule1_h); ax_haut.add_patch(boule2_h)
 
-# Panneau du BAS (inélastique) : des ELLIPSES, car on va pouvoir les ECRASER
-# (les déformer) au moment du choc pour montrer où part l'énergie perdue.
-boule1_b = Ellipse((monde_inelastique["x1"], 0), 2 * r1, 2 * r1, color="#e74c3c")
-boule2_b = Ellipse((monde_inelastique["x2"], 0), 2 * r2, 2 * r2, color="#3498db")
+boule1_b = plt.Circle((monde_inelastique["x1"], 0), r1, color="#e74c3c")
+boule2_b = plt.Circle((monde_inelastique["x2"], 0), r2, color="#3498db")
 ax_bas.add_patch(boule1_b); ax_bas.add_patch(boule2_b)
-
-# NOUVEAU : des "fissures" (lignes en zigzag) qui apparaissent sur les boules
-# écrasées du panneau inélastique. Elles illustrent la déformation du matériau.
-gabarits_fissures = [
-    np.array([(-0.5, 0.45), (-0.15, 0.05), (-0.4, -0.25), (0.0, -0.55)]),
-    np.array([(0.15, 0.6), (-0.05, 0.1), (0.3, -0.1), (0.1, -0.5)]),
-]
-fissure1a, = ax_bas.plot([], [], color="#6e120a", lw=1.6)   # sur la boule 1
-fissure1b, = ax_bas.plot([], [], color="#6e120a", lw=1.6)
-fissure2a, = ax_bas.plot([], [], color="#0d2c4a", lw=1.6)   # sur la boule 2
-fissure2b, = ax_bas.plot([], [], color="#0d2c4a", lw=1.6)
-fissures = [fissure1a, fissure1b, fissure2a, fissure2b]
-
-# Petite étiquette qui apparaît après le choc inélastique pour expliquer
-label_deform = ax_bas.text(0.1, -0.75, "", fontsize=9, color="#6e120a",
-                           fontstyle="italic")
 
 texte_h = ax_haut.text(0.1, 0.7, "", fontsize=9)
 texte_b = ax_bas.text(0.1, 0.7, "", fontsize=9)
@@ -192,52 +172,15 @@ def montrer_eclair(monde, eclair, texte_choc, frame):
         texte_choc.set_text("")
 
 
-def deformation(monde, frame):
-    """Quantité d'écrasement de 0 (pas déformé) à 1 (écrasé au maximum).
-    Elle monte vite après le choc puis reste à 1 : c'est une déformation
-    PERMANENTE (les boules restent écrasées et collées)."""
-    if monde["frame_du_choc"] is None:
-        return 0.0
-    age = frame - monde["frame_du_choc"]
-    if age < 0:
-        return 0.0
-    return min(1.0, age / 6.0)   # atteint le maximum en 6 images
-
-
 def animer(frame):
     avancer(monde_elastique, frame)
     avancer(monde_inelastique, frame)
 
-    # Boules du HAUT (élastique) : elles restent de parfaits ronds
+    # On replace les boules à leur nouvelle position
     boule1_h.center = (monde_elastique["x1"], 0)
     boule2_h.center = (monde_elastique["x2"], 0)
-
-    # Boules du BAS (inélastique) : on les ECRASE selon la déformation
-    amt = deformation(monde_inelastique, frame)
-    fw = 1 - 0.30 * amt   # la largeur diminue  -> la boule s'aplatit
-    fh = 1 + 0.20 * amt   # la hauteur augmente -> la boule "déborde"
-    comp = 0.12 * amt     # les centres se rapprochent -> elles se compressent
-    cx1 = monde_inelastique["x1"] + comp
-    cx2 = monde_inelastique["x2"] - comp
-
-    boule1_b.set_center((cx1, 0)); boule1_b.width = 2 * r1 * fw; boule1_b.height = 2 * r1 * fh
-    boule2_b.set_center((cx2, 0)); boule2_b.width = 2 * r2 * fw; boule2_b.height = 2 * r2 * fh
-
-    # On dessine les fissures sur les boules écrasées (seulement après le choc)
-    if amt > 0:
-        for ligne, gabarit, cx, rad in [
-            (fissure1a, gabarits_fissures[0], cx1, r1),
-            (fissure1b, gabarits_fissures[1], cx1, r1),
-            (fissure2a, gabarits_fissures[0], cx2, r2),
-            (fissure2b, gabarits_fissures[1], cx2, r2),
-        ]:
-            ligne.set_data(cx + gabarit[:, 0] * rad * fw, gabarit[:, 1] * rad * fh)
-        label_deform.set_text("Boules écrasées + fissurées : "
-                              "l'énergie perdue a servi à les déformer")
-    else:
-        for ligne in fissures:
-            ligne.set_data([], [])
-        label_deform.set_text("")
+    boule1_b.center = (monde_inelastique["x1"], 0)
+    boule2_b.center = (monde_inelastique["x2"], 0)
 
     # On gère l'éclair "CHOC !" dans chaque panneau
     montrer_eclair(monde_elastique, eclair_h, choc_h, frame)
@@ -252,8 +195,7 @@ def animer(frame):
                      f"Ec={Ec_b:.2f} J  (départ {Ec_depart:.2f} J)")
 
     return (boule1_h, boule2_h, boule1_b, boule2_b,
-            texte_h, texte_b, eclair_h, eclair_b, choc_h, choc_b,
-            fissure1a, fissure1b, fissure2a, fissure2b, label_deform)
+            texte_h, texte_b, eclair_h, eclair_b, choc_h, choc_b)
 
 
 # ---------------------------------------------------------------------------
